@@ -283,7 +283,7 @@ Be direct and evidence-based. Maximum 60 words total."""
                 try:
                     logger.info("Trying fallback model: gemini-1.5-flash")
                     response = llm_client.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.5-flash',
                         contents=prompt
                     )
                     if response and response.text:
