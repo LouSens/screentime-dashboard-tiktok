@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # IDE
 .idea/
 
@@ -7,6 +6,3 @@
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
-=======
-.env
->>>>>>> 765dcf216114720c5ba9077ae2734a5c990c6724
