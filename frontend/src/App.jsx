@@ -15,13 +15,13 @@ import {
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 const RISK_COLOR = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
-const RISK_BG    = { high: 'bg-red-50 border-red-200', medium: 'bg-amber-50 border-amber-200', low: 'bg-emerald-50 border-emerald-200' };
-const RISK_TEXT  = { high: 'text-red-600', medium: 'text-amber-600', low: 'text-emerald-600' };
-const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const PIE_COLORS = ['#ef4444','#3b82f6'];
+const RISK_BG = { high: 'bg-red-50 border-red-200', medium: 'bg-amber-50 border-amber-200', low: 'bg-emerald-50 border-emerald-200' };
+const RISK_TEXT = { high: 'text-red-600', medium: 'text-amber-600', low: 'text-emerald-600' };
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const PIE_COLORS = ['#ef4444', '#3b82f6'];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const pct  = (v) => `${(v * 100).toFixed(1)}%`;
+const pct = (v) => `${(v * 100).toFixed(1)}%`;
 const fmt1 = (v) => Number(v).toFixed(1);
 const fmtHour = (h) => {
   const ampm = h < 12 ? 'AM' : 'PM';
@@ -36,7 +36,7 @@ function TrendIcon({ trend }) {
 }
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
-function KpiCard({ title, value, unit='', sub='', icon: Icon, iconColor='text-blue-500', accent=false }) {
+function KpiCard({ title, value, unit = '', sub = '', icon: Icon, iconColor = 'text-blue-500', accent = false }) {
   return (
     <div className={`rounded-2xl p-5 border shadow-sm ${accent ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200'}`}>
       <div className="flex items-center justify-between mb-3">
@@ -53,7 +53,7 @@ function KpiCard({ title, value, unit='', sub='', icon: Icon, iconColor='text-bl
 }
 
 // ─── Section header ─────────────────────────────────────────────────────────
-function SectionHeader({ icon: Icon, title, color='text-blue-600' }) {
+function SectionHeader({ icon: Icon, title, color = 'text-blue-600' }) {
   return (
     <div className="flex items-center gap-2 mb-5">
       <Icon className={`w-4 h-4 ${color}`} />
@@ -126,12 +126,18 @@ function LandingPage({ onStart }) {
         {/* Feature grid */}
         <div className="mt-32 grid grid-cols-1 md:grid-cols-3 gap-8 text-left border-t border-slate-100 pt-16">
           {[
-            { icon: Clock,      color:'text-blue-600',    bg:'bg-blue-50 border-blue-100',
-              title:'Session Parsing', desc:'Detects 10-minute gap sessions and flags any binge exceeding 45 minutes, giving you a full session timeline.' },
-            { icon: Zap,        color:'text-indigo-600',  bg:'bg-indigo-50 border-indigo-100',
-              title:'Velocity Tracking', desc:'Calculates doomscroll velocity (clips/min) and consecutive binge streaks — the real markers of algorithmic lock-in.' },
-            { icon: Shield,     color:'text-emerald-600', bg:'bg-emerald-50 border-emerald-100',
-              title:'Relapse Forecasting', desc:'Ensemble of Logistic Regression, Random Forest, and XGBoost scores tomorrow\'s relapse probability at 96% accuracy.' },
+            {
+              icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100',
+              title: 'Session Parsing', desc: 'Detects 10-minute gap sessions and flags any binge exceeding 45 minutes, giving you a full session timeline.'
+            },
+            {
+              icon: Zap, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100',
+              title: 'Velocity Tracking', desc: 'Calculates doomscroll velocity (clips/min) and consecutive binge streaks — the real markers of algorithmic lock-in.'
+            },
+            {
+              icon: Shield, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100',
+              title: 'Relapse Forecasting', desc: 'Ensemble of Logistic Regression, Random Forest, and XGBoost scores tomorrow\'s relapse probability at 96% accuracy.'
+            },
           ].map(({ icon: Icon, color, bg, title, desc }) => (
             <div key={title}>
               <div className={`w-12 h-12 ${bg} border rounded-xl flex items-center justify-center mb-4`}>
@@ -153,11 +159,11 @@ function LandingPage({ onStart }) {
 
 // ─── Upload Panel ─────────────────────────────────────────────────────────────
 function UploadPanel({ onBack }) {
-  const [file, setFile]         = useState(null);
-  const [loading, setLoading]   = useState(false);
-  const [dragActive, setDrag]   = useState(false);
-  const [data, setData]         = useState(null);
-  const [error, setError]       = useState('');
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [dragActive, setDrag] = useState(false);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
 
   const onDrag = useCallback((e) => {
     e.preventDefault(); e.stopPropagation();
@@ -176,7 +182,7 @@ function UploadPanel({ onBack }) {
     const fd = new FormData();
     fd.append('file', file);
     try {
-      const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API = import.meta.env.VITE_API_URL || 'https://fortunate-perception-production-341b.up.railway.app/';
       const r = await fetch(`${API}/analyze`, { method: 'POST', body: fd });
       if (!r.ok) throw new Error(`Server error: ${r.status}`);
       setData(await r.json());
@@ -242,27 +248,27 @@ function Dashboard({ data, onReset }) {
 
   // chart formatters
   const trendData = c.dates.map((d, i) => ({
-    date:     new Date(d).toLocaleDateString(undefined, { month:'short', day:'numeric' }),
-    score:    c.scores[i],
-    clips:    c.clips[i],
-    watch:    c.watch_minutes[i],
+    date: new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    score: c.scores[i],
+    clips: c.clips[i],
+    watch: c.watch_minutes[i],
     velocity: c.velocity[i],
   }));
 
   const radarData = DAY_LABELS.map((day, i) => ({
     subject: day,
-    score:   c.radar_values[i] ?? 0,
-    clips:   c.radar_clips[i]  ?? 0,
+    score: c.radar_values[i] ?? 0,
+    clips: c.radar_clips[i] ?? 0,
     fullMark: Math.max(...c.radar_values, 10),
   }));
 
   const weeklyData = DAY_LABELS.map((day, i) => ({
-    day:   day,
+    day: day,
     clips: c.weekly_bar[i] ?? 0,
   }));
 
   const pieData = [
-    { name: 'Binge Sessions',  value: c.session_dist.binge  },
+    { name: 'Binge Sessions', value: c.session_dist.binge },
     { name: 'Normal Sessions', value: c.session_dist.normal },
   ];
 
@@ -283,7 +289,7 @@ function Dashboard({ data, onReset }) {
 
           {/* Tab nav */}
           <div className="hidden md:flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-            {[['overview','Overview'],['sessions','Sessions'],['patterns','Patterns']].map(([id,label]) => (
+            {[['overview', 'Overview'], ['sessions', 'Sessions'], ['patterns', 'Patterns']].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all
                   ${tab === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
@@ -306,8 +312,8 @@ function Dashboard({ data, onReset }) {
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-xl ${riskLevel === 'high' ? 'bg-red-100' : riskLevel === 'medium' ? 'bg-amber-100' : 'bg-emerald-100'}`}>
               {riskLevel === 'high' ? <ShieldAlert className="w-6 h-6 text-red-600" />
-                : riskLevel === 'low'  ? <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                : <AlertTriangle className="w-6 h-6 text-amber-600" />}
+                : riskLevel === 'low' ? <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                  : <AlertTriangle className="w-6 h-6 text-amber-600" />}
             </div>
             <div>
               <p className={`font-bold text-base ${RISK_TEXT[riskLevel]}`}>
@@ -328,25 +334,25 @@ function Dashboard({ data, onReset }) {
           <>
             {/* KPI row 1 – Events & Watch */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KpiCard title="Total Events"   value={s.total_events.toLocaleString()} icon={Activity}  iconColor="text-blue-500"
+              <KpiCard title="Total Events" value={s.total_events.toLocaleString()} icon={Activity} iconColor="text-blue-500"
                 sub={`~${s.total_watch_hours}h total watch time`} />
               <KpiCard title="Total Sessions" value={s.total_sessions.toLocaleString()} icon={BarChart3} iconColor="text-indigo-500"
                 sub={`${s.binge_sessions} binge sessions (${pct(s.binge_rate)})`} />
-              <KpiCard title="Avg Session"   value={fmt1(s.avg_session_minutes)} unit="min" icon={Clock}    iconColor="text-violet-500"
+              <KpiCard title="Avg Session" value={fmt1(s.avg_session_minutes)} unit="min" icon={Clock} iconColor="text-violet-500"
                 sub={`Longest: ${s.longest_session_minutes} min`} />
-              <KpiCard title="Relapse Risk"  value={(f.risk_score * 10).toFixed(1)} unit="/ 10" icon={ShieldAlert}
+              <KpiCard title="Relapse Risk" value={(f.risk_score * 10).toFixed(1)} unit="/ 10" icon={ShieldAlert}
                 iconColor={RISK_TEXT[riskLevel]} accent sub={`${riskLevel.toUpperCase()} — trend ${f.trend}`} />
             </div>
 
             {/* KPI row 2 – Behaviour signals */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KpiCard title="Doomscroll Velocity" value={fmt1(s.avg_velocity)} unit="clips/min" icon={Zap}     iconColor="text-amber-500"
+              <KpiCard title="Doomscroll Velocity" value={fmt1(s.avg_velocity)} unit="clips/min" icon={Zap} iconColor="text-amber-500"
                 sub="Average across all sessions" />
-              <KpiCard title="Late-Night Avg"      value={fmt1(s.avg_late_night_clips)} unit="clips/day" icon={Moon}    iconColor="text-purple-500"
+              <KpiCard title="Late-Night Avg" value={fmt1(s.avg_late_night_clips)} unit="clips/day" icon={Moon} iconColor="text-purple-500"
                 sub="Midnight → 7am window" />
-              <KpiCard title="Morning Trigger"     value={fmt1(s.avg_morning_clips)}    unit="clips/day" icon={Sunrise} iconColor="text-orange-500"
+              <KpiCard title="Morning Trigger" value={fmt1(s.avg_morning_clips)} unit="clips/day" icon={Sunrise} iconColor="text-orange-500"
                 sub="7am → 11am window" />
-              <KpiCard title="Bad-Habit Days"      value={pct(s.bad_days_ratio)} icon={Flame} iconColor="text-red-500"
+              <KpiCard title="Bad-Habit Days" value={pct(s.bad_days_ratio)} icon={Flame} iconColor="text-red-500"
                 sub={`Max binge streak: ${s.max_binge_streak} sessions`} />
             </div>
 
@@ -356,17 +362,17 @@ function Dashboard({ data, onReset }) {
                 <SectionHeader icon={LineChart} title="Daily Habit Score (Smoothed)" />
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top:5, right:5, left:-20, bottom:0 }}>
+                    <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gs" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.25} />
+                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
                           <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} minTickGap={20} dy={6} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} />
-                      <Tooltip contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:12 }} />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} minTickGap={20} dy={6} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: 12 }} />
                       <Area type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={2.5} fill="url(#gs)" dot={false} name="Habit Score" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -379,10 +385,10 @@ function Dashboard({ data, onReset }) {
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart cx="50%" cy="50%" outerRadius="68%" data={radarData}>
                       <PolarGrid stroke="#e2e8f0" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fill:'#64748b', fontSize:11 }} />
+                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11 }} />
                       <PolarRadiusAxis tick={false} axisLine={false} />
                       <Radar name="Habit Score" dataKey="score" stroke="#4f46e5" strokeWidth={2} fill="#4f46e5" fillOpacity={0.2} />
-                      <Radar name="Clips"       dataKey="clips" stroke="#06b6d4" strokeWidth={1.5} fill="#06b6d4" fillOpacity={0.1} />
+                      <Radar name="Clips" dataKey="clips" stroke="#06b6d4" strokeWidth={1.5} fill="#06b6d4" fillOpacity={0.1} />
                       <Tooltip />
                     </RadarChart>
                   </ResponsiveContainer>
@@ -396,11 +402,11 @@ function Dashboard({ data, onReset }) {
                 <SectionHeader icon={Zap} title="Doomscroll Velocity Over Time" color="text-amber-500" />
                 <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
-                    <RechartLine data={trendData} margin={{ top:5, right:5, left:-20, bottom:0 }}>
+                    <RechartLine data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} minTickGap={20} dy={6} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} />
-                      <Tooltip contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:12 }} />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} minTickGap={20} dy={6} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: 12 }} />
                       <Line type="monotone" dataKey="velocity" stroke="#f59e0b" strokeWidth={2} dot={false} name="clips/min" />
                     </RechartLine>
                   </ResponsiveContainer>
@@ -411,12 +417,12 @@ function Dashboard({ data, onReset }) {
                 <SectionHeader icon={BarChart3} title="Avg Clips by Day of Week" color="text-blue-600" />
                 <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weeklyData} margin={{ top:5, right:5, left:-20, bottom:0 }}>
+                    <BarChart data={weeklyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} />
-                      <Tooltip contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:12 }} />
-                      <Bar dataKey="clips" fill="#2563eb" radius={[4,4,0,0]} name="Avg Clips" />
+                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: 12 }} />
+                      <Bar dataKey="clips" fill="#2563eb" radius={[4, 4, 0, 0]} name="Avg Clips" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -438,12 +444,12 @@ function Dashboard({ data, onReset }) {
         {tab === 'sessions' && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KpiCard title="Total Sessions"    value={s.total_sessions} icon={Activity}  iconColor="text-blue-500" />
-              <KpiCard title="Binge Sessions"    value={s.binge_sessions} icon={Flame}     iconColor="text-red-500"
+              <KpiCard title="Total Sessions" value={s.total_sessions} icon={Activity} iconColor="text-blue-500" />
+              <KpiCard title="Binge Sessions" value={s.binge_sessions} icon={Flame} iconColor="text-red-500"
                 sub={`${pct(s.binge_rate)} of all sessions`} />
-              <KpiCard title="Max Binge Streak"  value={s.max_binge_streak} icon={TrendingUp} iconColor="text-orange-500"
+              <KpiCard title="Max Binge Streak" value={s.max_binge_streak} icon={TrendingUp} iconColor="text-orange-500"
                 sub="Consecutive binge sessions" />
-              <KpiCard title="Longest Session"   value={s.longest_session_minutes} unit="min" icon={Clock} iconColor="text-purple-500"
+              <KpiCard title="Longest Session" value={s.longest_session_minutes} unit="min" icon={Clock} iconColor="text-purple-500"
                 sub={`Avg: ${s.avg_session_minutes} min`} />
             </div>
 
@@ -455,7 +461,7 @@ function Dashboard({ data, onReset }) {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={pieData} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%"
-                        paddingAngle={3} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
+                        paddingAngle={3} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}>
                         {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
                       </Pie>
@@ -470,17 +476,17 @@ function Dashboard({ data, onReset }) {
                 <SectionHeader icon={Clock} title="Daily Watch Time (minutes)" color="text-violet-500" />
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top:5, right:5, left:-20, bottom:0 }}>
+                    <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.25} />
+                          <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.25} />
                           <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} minTickGap={20} dy={6} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} />
-                      <Tooltip contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:12 }} />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} minTickGap={20} dy={6} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: 12 }} />
                       <Area type="monotone" dataKey="watch" stroke="#7c3aed" strokeWidth={2} fill="url(#gw)" dot={false} name="Watch min" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -495,7 +501,7 @@ function Dashboard({ data, onReset }) {
                 <p className="text-4xl font-black text-slate-900">{pct(s.rewatched_ratio)}</p>
                 <p className="text-xs text-slate-400 mt-2">Duplicate video views in same day session</p>
                 <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5">
-                  <div className="bg-blue-500 h-1.5 rounded-full" style={{ width:`${s.rewatched_ratio * 100}%` }} />
+                  <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${s.rewatched_ratio * 100}%` }} />
                 </div>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
@@ -520,7 +526,7 @@ function Dashboard({ data, onReset }) {
               <SectionHeader icon={Eye} title="Activity Heatmap (Hour × Day)" color="text-slate-600" />
               <div className="min-w-[700px]">
                 <div className="flex text-xs text-slate-400 mb-1 ml-12 gap-px">
-                  {Array.from({length:24},(_,i)=> (
+                  {Array.from({ length: 24 }, (_, i) => (
                     <div key={i} className="w-7 text-center">{i % 3 === 0 ? `${i}h` : ''}</div>
                   ))}
                 </div>
@@ -544,7 +550,7 @@ function Dashboard({ data, onReset }) {
                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
                   <span>Low</span>
                   <div className="flex gap-1">
-                    {['bg-slate-50','bg-blue-200','bg-amber-300','bg-orange-400','bg-red-500'].map(c=>(
+                    {['bg-slate-50', 'bg-blue-200', 'bg-amber-300', 'bg-orange-400', 'bg-red-500'].map(c => (
                       <div key={c} className={`w-5 h-3 rounded-sm ${c}`} />
                     ))}
                   </div>
@@ -558,17 +564,17 @@ function Dashboard({ data, onReset }) {
               <SectionHeader icon={BarChart3} title="Daily Clip Count" />
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData} margin={{ top:5, right:5, left:-20, bottom:0 }}>
+                  <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="gc" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#06b6d4" stopOpacity={0.25} />
+                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.25} />
                         <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} minTickGap={20} dy={6} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94a3b8', fontSize:11 }} />
-                    <Tooltip contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:12 }} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} minTickGap={20} dy={6} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: 12 }} />
                     <Area type="monotone" dataKey="clips" stroke="#06b6d4" strokeWidth={2} fill="url(#gc)" dot={false} name="Clips" />
                   </AreaChart>
                 </ResponsiveContainer>
