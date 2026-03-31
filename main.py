@@ -52,14 +52,15 @@ model_data = {}
 MODEL_LOADED = False
 FEATURE_NAMES = []
 try:
-    model_data['model']   = joblib.load('tiktok_voting_model.pkl')
-    model_data['scaler']  = joblib.load('tiktok_scaler.pkl')
-    model_data['d_thresh'] = joblib.load('decision_threshold.pkl')
+    MODEL_DIR = Path('models')
+    model_data['model']    = joblib.load(MODEL_DIR / 'tiktok_voting_model.pkl')
+    model_data['scaler']   = joblib.load(MODEL_DIR / 'tiktok_scaler.pkl')
+    model_data['d_thresh'] = joblib.load(MODEL_DIR / 'decision_threshold.pkl')
     try:
-        FEATURE_NAMES = joblib.load('feature_names.pkl')
+        FEATURE_NAMES = joblib.load(MODEL_DIR / 'feature_names.pkl')
     except Exception:
         import json
-        with open('feature_names.json') as f:
+        with open(MODEL_DIR / 'feature_names.json') as f:
             FEATURE_NAMES = json.load(f)
     MODEL_LOADED = True
     logger.info(f"✓ Model loaded — {len(FEATURE_NAMES)} features")

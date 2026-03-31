@@ -59,7 +59,8 @@ warnings.filterwarnings('ignore')
 # ─────────────────────────────────────────────
 TARGET_TIMEZONE    = 'Asia/Kuala_Lumpur'
 DATASET_DIR        = Path('dataset')
-OUTPUT_DIR         = Path('.')          # where .pkl files land
+OUTPUT_DIR         = Path('models')       # .pkl files
+REPORTS_DIR        = Path('reports')      # .png reports
 
 SESSION_GAP_MIN    = 10                 # minutes → new session boundary
 DEFAULT_WATCH_SEC  = 30                 # assumed clip length when gap is huge
@@ -481,7 +482,7 @@ def train_model(X: pd.DataFrame, y: pd.Series):
 # ─────────────────────────────────────────────
 # 9.  VISUALISATIONS
 # ─────────────────────────────────────────────
-def plot_eda(daily: pd.DataFrame, out_dir: Path = OUTPUT_DIR):
+def plot_eda(daily: pd.DataFrame, out_dir: Path = REPORTS_DIR):
     """4-panel EDA figure saved as PNG."""
     fig, axes = plt.subplots(2, 2, figsize=(16, 10))
     fig.suptitle('TikTok Behavioural EDA', fontsize=15, fontweight='bold')
@@ -530,7 +531,7 @@ def plot_eda(daily: pd.DataFrame, out_dir: Path = OUTPUT_DIR):
 
 
 def plot_feature_importance(model, feature_names: list,
-                            out_dir: Path = OUTPUT_DIR):
+                            out_dir: Path = REPORTS_DIR):
     """Extract RF feature importances from the voting ensemble."""
     try:
         # access the RandomForest inside VotingClassifier (index 1)
@@ -553,7 +554,7 @@ def plot_feature_importance(model, feature_names: list,
         print(f"  [WARN] Feature importance plot skipped: {e}")
 
 
-def plot_confusion(y_test, y_pred, out_dir: Path = OUTPUT_DIR):
+def plot_confusion(y_test, y_pred, out_dir: Path = REPORTS_DIR):
     fig, ax = plt.subplots(figsize=(5, 4))
     sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d',
                 cmap='Purples', ax=ax)
@@ -573,6 +574,8 @@ def plot_confusion(y_test, y_pred, out_dir: Path = OUTPUT_DIR):
 def save_artefacts(model, scaler, best_thresh: float,
                    feature_names: list, out_dir: Path = OUTPUT_DIR):
     """Persist all model artefacts consumed by the FastAPI backend."""
+    out_dir.mkdir(exist_ok=True)
+    REPORTS_DIR.mkdir(exist_ok=True)
     joblib.dump(model,        out_dir / 'tiktok_voting_model.pkl')
     joblib.dump(scaler,       out_dir / 'tiktok_scaler.pkl')
     joblib.dump(best_thresh,  out_dir / 'decision_threshold.pkl')

@@ -1,8 +1,37 @@
-# IDE
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
 .idea/
+.vscode/
+.DS_Store
+Thumbs.db
 
-# Environment variables
+# ── Secrets ───────────────────────────────────────────────────────────────────
 .env
+*.env
 
-# Jupyter Notebook checkpoints
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
 .ipynb_checkpoints/
+*.ipynb
+
+# ── Data (large / private) ────────────────────────────────────────────────────
+dataset/
+*.txt
+
+# ── Logs / temp ───────────────────────────────────────────────────────────────
+*.log
+output.log
+
+# ── Frontend build artifacts ──────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── Conda / virtualenv ────────────────────────────────────────────────────────
+*.conda
+envs/
