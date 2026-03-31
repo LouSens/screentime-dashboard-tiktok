@@ -12,366 +12,369 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-env_path = Path('.') / '.env'
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path=Path('.') / '.env')
 
-# --- CONFIGURATION ---
 TIMEZONE = 'Asia/Kuala_Lumpur'
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Debug prints
-print(f"📁 .env file exists: {env_path.exists()}")
-print(f"📁 .env file path: {env_path.absolute()}")
-if GEMINI_API_KEY:
-    print(f"🔑 API Key loaded: Yes ({GEMINI_API_KEY[:15]}...)")
-else:
-    print(f"🔑 API Key loaded: ❌ NO - Check your .env file!")
+print(f"📁 .env file exists: {(Path('.') / '.env').exists()}")
+print(f"🔑 API Key loaded: {'Yes' if GEMINI_API_KEY else '❌ NO'}")
 
-# Configure logging BEFORE trying to use it
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Configure Gemini with better error handling
+# ── Gemini ─────────────────────────────────────────────────────────────────
 llm_client = None
 GEMINI_AVAILABLE = False
-
+working_model = None
 try:
     from google import genai
-
-    logger.info("✓ google-genai package imported (NEW API)")
-
     if GEMINI_API_KEY and len(GEMINI_API_KEY) > 10:
-        # New API uses Client()
         llm_client = genai.Client(api_key=GEMINI_API_KEY)
-
-        # Test with available models
-        model_names = [
-            'gemini-2.5-flash-lite'
-        ]
-
-        working_model = None
-        for model_name in model_names:
+        for mn in ['gemini-2.5-flash-lite']:
             try:
-                logger.info(f"Testing model: {model_name}")
-                test_response = llm_client.models.generate_content(
-                    model=model_name,
-                    contents="Say OK"
-                )
-                logger.info(f"✓ Model '{model_name}' works!")
-                working_model = model_name
+                llm_client.models.generate_content(model=mn, contents="Say OK")
+                working_model = mn
                 GEMINI_AVAILABLE = True
+                logger.info(f"✓ Gemini ready: {mn}")
                 break
-            except Exception as model_error:
-                logger.warning(f"✗ Model '{model_name}' failed: {str(model_error)[:100]}")
+            except Exception:
                 continue
-
-        if working_model:
-            logger.info(f"✓ Gemini AI Ready with model: {working_model}")
-        else:
-            logger.error("✗ No working Gemini models found")
-    else:
-        logger.warning(f"⚠ Gemini API Key issue - Length: {len(GEMINI_API_KEY)}")
-except ImportError as e:
-    logger.warning(f"⚠ google-genai package not found: {e}")
-    logger.warning("   Install with: pip install google-genai")
 except Exception as e:
-    logger.error(f"✗ Gemini initialization failed: {e}")
+    logger.warning(f"Gemini unavailable: {e}")
 
-app = FastAPI(title="Dopamine Defense API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ── App ─────────────────────────────────────────────────────────────────────
+app = FastAPI(title="Neural Void — Behaviour Analysis API")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Load Models with better error handling
+# ── Load ML artefacts ───────────────────────────────────────────────────────
 model_data = {}
 MODEL_LOADED = False
-
+FEATURE_NAMES = []
 try:
-    model_data['model'] = joblib.load('tiktok_voting_model.pkl')
-    model_data['scaler'] = joblib.load('tiktok_scaler.pkl')
-    model_data['robust_thresh'] = joblib.load('robust_threshold.pkl')
-    model_data['decision_thresh'] = joblib.load('decision_threshold.pkl')
+    model_data['model']   = joblib.load('tiktok_voting_model.pkl')
+    model_data['scaler']  = joblib.load('tiktok_scaler.pkl')
+    model_data['d_thresh'] = joblib.load('decision_threshold.pkl')
+    try:
+        FEATURE_NAMES = joblib.load('feature_names.pkl')
+    except Exception:
+        import json
+        with open('feature_names.json') as f:
+            FEATURE_NAMES = json.load(f)
     MODEL_LOADED = True
-    logger.info("✓ ML Models Loaded Successfully")
-except FileNotFoundError as e:
-    logger.warning(f"⚠ Model files not found: {e}. Using fallback values.")
-    model_data['robust_thresh'] = 250
-    model_data['decision_thresh'] = 0.5
+    logger.info(f"✓ Model loaded — {len(FEATURE_NAMES)} features")
 except Exception as e:
-    logger.error(f"✗ Model loading error: {e}")
-    model_data['robust_thresh'] = 250
-    model_data['decision_thresh'] = 0.5
+    logger.warning(f"⚠ Model load: {e}")
+    model_data['d_thresh'] = 0.5
+
+# ── Constants matching tiktok-analysis.py ──────────────────────────────────
+SESSION_GAP_MIN   = 10
+DEFAULT_WATCH_SEC = 30
+BINGE_THRESHOLD   = 45
+SLEEP_HOURS       = list(range(0, 7))
+WORK_HOURS        = list(range(9, 19))
+MORNING_HOURS     = list(range(7, 11))
+EVENING_HOURS     = list(range(18, 23))
+LABEL_QUANTILE    = 0.40
+OUTLIER_QUANTILE  = 0.95
+
+
+# ── Core feature engineering (mirrors tiktok-analysis.py) ──────────────────
+def full_feature_pipeline(content_str: str):
+    """
+    Parse text → sessions → per-day 25-feature table → prediction.
+    Returns (daily_df, raw_df, feature_vector_today)
+    """
+    matches = re.findall(r"Date:\s*(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s*UTC", content_str)
+    links   = re.findall(r"Link:\s*(https?://\S+)", content_str)
+    if not matches:
+        raise ValueError("No UTC timestamps found in file.")
+
+    # ── build raw df ──────────────────────────────────────────────────────
+    df = pd.DataFrame({'timestamp': matches})
+    df['timestamp']  = pd.to_datetime(df['timestamp'])
+    df['link']       = (links + [''] * len(matches))[:len(matches)]
+    df['video_id']   = df['link'].str.extract(r'/video/(\d+)')
+    df = df.sort_values('timestamp').reset_index(drop=True)
+    df['local_time'] = df['timestamp'].dt.tz_localize('UTC').dt.tz_convert(TIMEZONE)
+
+    # ── session detection ─────────────────────────────────────────────────
+    gap_thresh = SESSION_GAP_MIN * 60
+    df['gap_sec']     = df['timestamp'].diff().dt.total_seconds().fillna(gap_thresh + 1)
+    df['new_session'] = (df['gap_sec'] > gap_thresh).astype(int)
+    df['session_id']  = df['new_session'].cumsum()
+
+    sess = df.groupby('session_id').agg(
+        s_start=('timestamp', 'min'),
+        s_end  =('timestamp', 'max'),
+        s_clips=('timestamp', 'count'),
+    ).reset_index()
+    sess['session_duration_min'] = (sess['s_end'] - sess['s_start']).dt.total_seconds() / 60
+    sess['is_binge'] = (sess['session_duration_min'] >= BINGE_THRESHOLD).astype(int)
+    df = df.merge(sess[['session_id','session_duration_min','is_binge']], on='session_id', how='left')
+
+    df['watch_sec'] = df['gap_sec'].apply(
+        lambda g: DEFAULT_WATCH_SEC if (pd.isna(g) or g > gap_thresh) else g
+    )
+    df['watch_min'] = df['watch_sec'] / 60
+
+    # ── temporal flags ────────────────────────────────────────────────────
+    df['date']        = df['local_time'].dt.date
+    df['hour']        = df['local_time'].dt.hour
+    df['day_of_week'] = df['local_time'].dt.dayofweek   # 0=Mon … 6=Sun
+    df['is_weekend']  = df['day_of_week'] >= 5
+
+    df['is_late_night'] = df['hour'].isin(SLEEP_HOURS)
+    df['is_work_hour']  = (~df['is_weekend']) & (df['hour'].isin(WORK_HOURS))
+    df['is_morning']    = df['hour'].isin(MORNING_HOURS)
+    df['is_evening']    = df['hour'].isin(EVENING_HOURS)
+
+    # ── daily aggregation ─────────────────────────────────────────────────
+    daily = df.groupby('date').agg(
+        total_clips        =('timestamp',             'count'),
+        total_watch_min    =('watch_min',             'sum'),
+        late_night_clips   =('is_late_night',         'sum'),
+        work_hour_clips    =('is_work_hour',          'sum'),
+        morning_clips      =('is_morning',            'sum'),
+        evening_clips      =('is_evening',            'sum'),
+        total_sessions     =('session_id',            'nunique'),
+        binge_sessions     =('is_binge',              'max'),
+        avg_session_min    =('session_duration_min',  'mean'),
+        max_session_min    =('session_duration_min',  'max'),
+        avg_watch_clip_sec =('watch_sec',             'mean'),
+        unique_videos      =('video_id',              'nunique'),
+    ).reset_index()
+
+    daily['day_of_week']    = pd.to_datetime(daily['date']).dt.dayofweek
+    daily['is_weekend_day'] = daily['day_of_week'] >= 5
+
+    daily['doomscroll_velocity'] = (
+        daily['total_clips'] / daily['total_watch_min'].replace(0, np.nan)
+    ).fillna(0)
+    daily['late_night_ratio'] = (
+        daily['late_night_clips'] / daily['total_clips'].replace(0, np.nan)
+    ).fillna(0)
+    daily['rewatched_ratio'] = (
+        1 - daily['unique_videos'] / daily['total_clips'].replace(0, np.nan)
+    ).clip(0, 1).fillna(0)
+
+    # ── label / smoothed score ────────────────────────────────────────────
+    def score_row(r):
+        sp = r['late_night_clips'] * 3.0
+        if r['is_weekend_day']:
+            return sp + r['total_clips'] * 0.2
+        return sp + r['work_hour_clips'] * 2.0 + r['total_clips'] * 0.05
+
+    daily['raw_score']     = daily.apply(score_row, axis=1)
+    cap                    = daily['raw_score'].quantile(OUTLIER_QUANTILE)
+    daily['capped_score']  = daily['raw_score'].clip(upper=cap)
+    daily['smoothed_score']= daily['capped_score'].ewm(span=3).mean()
+    threshold              = daily['smoothed_score'].quantile(LABEL_QUANTILE)
+    daily['is_bad_habit']  = (daily['smoothed_score'] >= threshold).astype(int)
+
+    # ── lag / rolling features ────────────────────────────────────────────
+    for col in ['smoothed_score','total_clips','late_night_clips',
+                'doomscroll_velocity','binge_sessions']:
+        daily[f'{col}_lag1'] = daily[col].shift(1)
+        daily[f'{col}_lag3'] = daily[col].shift(3)
+
+    daily['volatility_5d'] = daily['smoothed_score'].rolling(5).std().shift(1)
+    daily['trend_3d']      = (
+        daily['smoothed_score'].rolling(3).mean().shift(1) -
+        daily['smoothed_score'].rolling(7).mean().shift(1)
+    )
+    daily['binge_streak']  = daily['binge_sessions'].rolling(3).sum().shift(1).fillna(0)
+
+    return daily, df, sess
 
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
-    try:
-        with open("index.html", "r", encoding='utf-8') as f:
-            return f.read()
-    except FileNotFoundError:
-        return "<h1>Error: index.html not found in current directory.</h1>"
+    return "<h1>Neural Void API is running.</h1>"
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint to verify API status"""
-    return {
-        "status": "healthy",
-        "gemini_available": GEMINI_AVAILABLE,
-        "model_loaded": MODEL_LOADED,
-        "api_key_configured": bool(GEMINI_API_KEY),
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"status": "healthy", "model_loaded": MODEL_LOADED, "gemini": GEMINI_AVAILABLE}
 
 
 @app.post("/analyze")
 async def analyze_file(file: UploadFile = File(...)):
     try:
-        # Read file content
-        content = await file.read()
-        content_str = content.decode('utf-8', errors='ignore')
+        content_str = (await file.read()).decode('utf-8', errors='ignore')
 
-        # 0. GET CURRENT LOCAL CONTEXT
-        now_utc = pd.Timestamp.now(tz='UTC')
-        now_local = now_utc.tz_convert(TIMEZONE)
-        today_name = now_local.day_name()
-        tomorrow_name = (now_local + pd.Timedelta(days=1)).day_name()
+        daily, raw_df, sess = full_feature_pipeline(content_str)
 
-        # 1. PARSE TIMESTAMPS
-        matches = re.findall(r"Date:\s*(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s*UTC", content_str)
-        if not matches:
-            raise HTTPException(400, "Invalid file format. No UTC timestamps found in file.")
+        # ── prediction ────────────────────────────────────────────────────
+        risk_score = 0.5
+        FEATURE_COLS = [
+            'total_clips','total_watch_min',
+            'late_night_clips','work_hour_clips','morning_clips','evening_clips',
+            'late_night_ratio',
+            'total_sessions','binge_sessions','avg_session_min','max_session_min',
+            'doomscroll_velocity','avg_watch_clip_sec','rewatched_ratio',
+            'day_of_week','is_weekend_day',
+            'smoothed_score_lag1','smoothed_score_lag3',
+            'total_clips_lag1',
+            'late_night_clips_lag1',
+            'doomscroll_velocity_lag1',
+            'binge_sessions_lag1',
+            'binge_streak',
+            'volatility_5d','trend_3d',
+        ]
 
-        logger.info(f"Parsed {len(matches)} events from uploaded file")
-
-        df = pd.DataFrame(matches, columns=['timestamp'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-        df['local_time'] = df['timestamp'].dt.tz_localize('UTC').dt.tz_convert(TIMEZONE)
-
-        # 2. FEATURE ENGINEERING
-        df['date'] = df['local_time'].dt.date
-        df['hour'] = df['local_time'].dt.hour
-        df['day_of_week'] = df['local_time'].dt.dayofweek  # 0=Mon, 6=Sun
-        df['is_weekend'] = df['day_of_week'] >= 5
-
-        df['is_sleep_sabotage'] = df['hour'].isin([2, 3, 4, 5, 6, 7])
-        df['is_work_sabotage'] = (~df['is_weekend']) & (df['hour'].between(9, 18))
-
-        # Daily Aggregation
-        daily = df.groupby('date').agg(
-            total_clicks=('timestamp', 'count'),
-            late_night_clicks=('is_sleep_sabotage', 'sum'),
-            work_hour_clicks=('is_work_sabotage', 'sum'),
-            morning_clicks=('hour', lambda x: x.isin([7, 8, 9, 10]).sum())
-        ).reset_index()
-        daily['day_of_week'] = pd.to_datetime(daily['date']).dt.dayofweek
-
-        # Scoring Algorithm
-        def calculate_score(row):
-            sleep_penalty = row['late_night_clicks'] * 3.0
-            if row['day_of_week'] >= 5:
-                return sleep_penalty + (row['total_clicks'] * 0.2)
-            else:
-                return sleep_penalty + (row['work_hour_clicks'] * 2.0) + (row['total_clicks'] * 0.05)
-
-        daily['raw_score'] = daily.apply(calculate_score, axis=1)
-
-        # Smoothing with outlier capping
-        cap = daily['raw_score'].quantile(0.95)
-        daily['smoothed'] = np.where(daily['raw_score'] > cap, cap, daily['raw_score'])
-        daily['smoothed'] = daily['smoothed'].ewm(span=3).mean()
-        daily['is_bad'] = (daily['smoothed'] >= model_data.get('robust_thresh', 250)).astype(int)
-
-        # 3. RISK PREDICTION
-        risk_score = 0.5  # Default fallback
         if MODEL_LOADED and 'model' in model_data:
             try:
-                last = daily.iloc[-1]
-                volatility = daily['smoothed'].rolling(5).std().iloc[-1]
-                if pd.isna(volatility):
-                    volatility = 0
-
-                # Predict tomorrow's risk
-                X_new = pd.DataFrame([[
-                    (last['day_of_week'] + 1) % 7,
-                    last['smoothed'],
-                    daily['morning_clicks'].mean(),
-                    volatility
-                ]], columns=['day_of_week', 'prev_score', 'morning_clicks', 'volatility'])
-
-                risk_score = float(model_data['model'].predict_proba(
-                    model_data['scaler'].transform(X_new)
-                )[0][1])
-                logger.info(f"Predicted risk score: {risk_score:.3f}")
+                clean = daily.dropna(subset=FEATURE_COLS)
+                if len(clean) > 0:
+                    last_row = clean.iloc[-1][FEATURE_COLS].values.reshape(1, -1)
+                    X_scaled = model_data['scaler'].transform(last_row)
+                    risk_score = float(model_data['model'].predict_proba(X_scaled)[0][1])
             except Exception as e:
-                logger.error(f"Prediction error: {e}")
-                risk_score = 0.5
+                logger.warning(f"Prediction error: {e}")
 
-        # 4. PREPARE CHART DATA
+        # ── aggregate stats ───────────────────────────────────────────────
+        total_sessions  = int(sess['session_id'].count())
+        binge_count     = int(sess['is_binge'].sum())
+        avg_sess_min    = float(sess['session_duration_min'].mean()) if len(sess) else 0
+        max_sess_min    = float(sess['session_duration_min'].max())  if len(sess) else 0
+        avg_velocity    = float(daily['doomscroll_velocity'].mean())
+        total_watch_hrs = float(daily['total_watch_min'].sum()) / 60
+        bad_days_ratio  = float(daily['is_bad_habit'].mean())
+        avg_late_night  = float(daily['late_night_clips'].mean())
+        avg_morning     = float(daily['morning_clips'].mean())
+        avg_rewatched   = float(daily['rewatched_ratio'].mean())
 
-        # A. Heatmap Matrix (7 days × 24 hours)
-        heatmap_df = df.groupby(['day_of_week', 'hour']).size().unstack(fill_value=0)
-        heatmap_df = heatmap_df.reindex(index=range(7), columns=range(24), fill_value=0)
-        z_matrix = heatmap_df.values.tolist()
+        # peak hour
+        hour_counts     = raw_df['hour'].value_counts()
+        peak_hour       = int(hour_counts.idxmax()) if len(hour_counts) else 0
+        peak_day_idx    = daily.groupby('day_of_week')['total_clips'].mean().idxmax()
+        day_names       = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+        peak_day        = day_names[int(peak_day_idx)]
 
-        # B. Radar Chart (Average score per weekday)
-        radar_stats = daily.groupby('day_of_week')['smoothed'].mean()
-        radar_stats = radar_stats.reindex(range(7), fill_value=0).tolist()
+        # binge streak (consecutive binge days)
+        binge_streak_max = int(daily['binge_streak'].max()) if 'binge_streak' in daily.columns else 0
 
-        # C. Statistics for AI prompt
-        bad_ratio = daily['is_bad'].mean()
-        worst_day = int(np.argmax(radar_stats))
-        total_events = len(df)
-        avg_daily = daily['total_clicks'].mean()
-        peak_hour = df['hour'].mode()[0] if len(df) > 0 else 0
+        # trend direction (last 7 days vs previous 7)
+        if len(daily) >= 14:
+            recent  = daily['smoothed_score'].iloc[-7:].mean()
+            earlier = daily['smoothed_score'].iloc[-14:-7].mean()
+            trend   = "worsening" if recent > earlier else "improving"
+        else:
+            trend = "insufficient data"
 
-        # 5. GEMINI AI RECOMMENDATION
-        ai_recommendation = "🤖 AI strategist is currently unavailable. Check your API key configuration."
+        # ── chart data ────────────────────────────────────────────────────
+        # Trend area chart (daily smoothed score)
+        trend_dates  = daily['date'].astype(str).tolist()
+        trend_scores = [round(x, 2) for x in daily['smoothed_score'].tolist()]
+        trend_clips  = daily['total_clips'].tolist()
+        trend_watch  = [round(x, 1) for x in daily['total_watch_min'].tolist()]
+        trend_velocity = [round(x, 2) for x in daily['doomscroll_velocity'].tolist()]
 
+        # Radar: per-day pattern
+        radar_values = daily.groupby('day_of_week')['smoothed_score'].mean()\
+                            .reindex(range(7), fill_value=0).tolist()
+        radar_clips  = daily.groupby('day_of_week')['total_clips'].mean()\
+                            .reindex(range(7), fill_value=0).tolist()
+
+        # Heatmap (hour × day)
+        heatmap = raw_df.groupby(['day_of_week','hour']).size()\
+                        .unstack(fill_value=0)\
+                        .reindex(index=range(7), columns=range(24), fill_value=0)
+        z_matrix = heatmap.values.tolist()
+
+        # Weekly bar — clips per day-of-week
+        weekly_bar = [round(x, 1) for x in daily.groupby('day_of_week')['total_clips']
+                      .mean().reindex(range(7), fill_value=0).tolist()]
+
+        # Session distribution: binge vs normal
+        session_dist = {
+            "binge":  binge_count,
+            "normal": total_sessions - binge_count
+        }
+
+        # ── Gemini prompt with all 25 features ───────────────────────────
+        ai_recommendation = "AI insights unavailable."
         if GEMINI_AVAILABLE and llm_client:
             try:
-                day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                prompt = f"""You are a clinical-grade digital wellness analyst for the Neural Void platform.
 
-                prompt = f"""You are a social media behavioral addiction analyst. Analyze this TikTok usage data:
+BEHAVIOURAL METRICS (25 ML features extracted):
+- Total watch events: {len(raw_df):,}
+- Est. total watch time: {total_watch_hrs:.1f} hours
+- Total sessions: {total_sessions} | Binge sessions (>45m): {binge_count} ({binge_count/max(total_sessions,1):.0%})
+- Avg session: {avg_sess_min:.1f} min | Longest: {max_sess_min:.1f} min
+- Doomscroll velocity: {avg_velocity:.2f} clips/min
+- Late-night usage avg: {avg_late_night:.1f} clips/day
+- Morning trigger avg: {avg_morning:.1f} clips/day
+- Re-watch ratio: {avg_rewatched:.1%}
+- Bad-habit days: {bad_days_ratio:.0%} of tracked period
+- Peak day: {peak_day} | Peak hour: {peak_hour:02d}:00
+- Relapse risk score: {risk_score:.0%} ({('HIGH' if risk_score > 0.6 else 'MEDIUM' if risk_score > 0.3 else 'LOW')})
+- Behaviour trend: {trend}
+- Max consecutive binge sessions: {binge_streak_max}
 
-📊 KEY METRICS:
-- Total Events Tracked: {total_events}
-- Average Daily Usage: {avg_daily:.1f} events
-- Unproductive Days: {bad_ratio:.1%}
-- Tomorrow's Relapse Risk: {risk_score:.1%}
-- Most Vulnerable Day: {day_names[worst_day]}
-- Peak Usage Hour: {peak_hour}:00
-- **Current Time**: {now_local.strftime('%Y-%m-%d %H:%M')} ({today_name})
-- **Prediction Target**: {tomorrow_name}
+Write a professional, data-driven assessment in exactly 3 labelled parts:
+**Behavioral Diagnosis:** (1 sentence referencing velocity, binge rate, and sleep impact)
+**Risk Forecast:** (1 sentence on tomorrow's relapse probability and the primary risk driver)
+**Intervention Protocol:** (1 actionable sentence: a specific hour-range or session-cap recommendation)
+Be clinical and precise. Max 75 words total."""
 
-TASK: Provide a clinical yet actionable assessment in exactly 3 parts:
-**Pattern Recognition** 
-The most concerning behavioral pattern (1 sentence)
-**Risk Factor**
-Why tomorrow is specifically risky (1 sentence)
-**Intervention**
-One concrete action for the next 24 hours (1 sentence)
-
-Be direct and evidence-based. Maximum 60 words total."""
-
-                logger.info("Sending request to Gemini API (NEW)...")
-
-                # Use NEW API syntax
-                response = llm_client.models.generate_content(
-                    model='gemini-2.5-flash-lite',  # Try latest model first
-                    contents=prompt
-                )
-
-                if response and hasattr(response, 'text') and response.text:
-                    ai_recommendation = response.text.strip()
-                    logger.info(f"✓ Gemini response received ({len(ai_recommendation)} chars)")
-                else:
-                    logger.warning("Gemini returned empty response")
-                    ai_recommendation = "⚠️ AI analysis returned empty response. This may be a temporary API issue."
-
+                resp = llm_client.models.generate_content(model=working_model, contents=prompt)
+                if resp and hasattr(resp, 'text') and resp.text:
+                    ai_recommendation = resp.text.strip()
             except Exception as e:
-                logger.error(f"Gemini API error: {type(e).__name__}: {str(e)}")
+                ai_recommendation = f"Analysis error: {e}"
 
-                # Try fallback model if first fails
-                try:
-                    logger.info("Trying fallback model: gemini-2.5-flash")
-                    response = llm_client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt
-                    )
-                    if response and response.text:
-                        ai_recommendation = response.text.strip()
-                        logger.info("✓ Fallback model succeeded")
-                    else:
-                        raise Exception("Fallback returned empty")
-                except Exception as fallback_error:
-                    logger.error(f"Fallback also failed: {fallback_error}")
-
-                    # Provide specific error messages
-                    if "429" in str(e):
-                        ai_recommendation = "⚠️ Rate limit exceeded. Please wait a moment and try again."
-                    elif "quota" in str(e).lower():
-                        ai_recommendation = "⚠️ API quota exceeded. Check your Gemini API usage at https://aistudio.google.com"
-                    elif "api_key" in str(e).lower() or "401" in str(e):
-                        ai_recommendation = "⚠️ Invalid API key. Please verify your GEMINI_API_KEY in .env file."
-                    elif "404" in str(e):
-                        ai_recommendation = f"⚠️ Model not found. Error: {str(e)[:200]}"
-                    else:
-                        ai_recommendation = f"⚠️ AI analysis failed: {str(e)[:150]}"
-        else:
-            # Fallback rule-based recommendation when Gemini is unavailable
-            day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
-            if risk_score > 0.6:
-                ai_recommendation = f"""**1. Pattern Recognition** Your usage shows critical addiction markers with {bad_ratio:.0%} unproductive days and peak activity at {peak_hour}:00.
-
-**2. Risk Factor** Tomorrow ({tomorrow_name}) has {risk_score:.0%} relapse probability based on historical patterns and current local date ({today_name}).
-
-**3. Intervention** Close the TikTok app tonight and replace it with a 30-minute walk or hobby activity during your peak usage hour."""
-            elif risk_score > 0.3:
-                ai_recommendation = f"""**1. Pattern Recognition** Moderate addiction pattern detected with elevated usage on {day_names[worst_day]}s and during hour {peak_hour}.
-
-**2. Risk Factor** Tomorrow is ({tomorrow_name}), shows {risk_score:.0%} risk based on weekly patterns and recent behavior trends.
-
-**3. Intervention** Set a 15-minute timer before opening TikTok tomorrow, and use website blockers during work hours."""
-            else:
-                ai_recommendation = f"""**1. Pattern Recognition** Controlled usage pattern with {bad_ratio:.0%} problematic days, showing good self-regulation.
-
-**2. Risk Factor** Tomorrow has low risk ({risk_score:.0%}), but maintain awareness during peak hour ({peak_hour}:00).
-
-**3. Intervention** Continue current habits and track weekly patterns to prevent regression."""
-
-        # 6. RETURN COMPLETE ANALYSIS
         return {
             "status": "success",
             "forecast": {
                 "risk_score": round(risk_score, 4),
-                "risk_level": "high" if risk_score > 0.6 else ("medium" if risk_score > 0.3 else "low")
+                "risk_level": "high" if risk_score > 0.6 else ("medium" if risk_score > 0.3 else "low"),
+                "trend": trend,
             },
             "statistics": {
-                "total_events": total_events,
-                "date_range": {
-                    "start": str(daily['date'].min()),
-                    "end": str(daily['date'].max())
-                },
-                "bad_days": int(daily['is_bad'].sum()),
-                "bad_ratio": round(bad_ratio, 3)
+                # Volume
+                "total_events":           len(raw_df),
+                "total_watch_hours":      round(total_watch_hrs, 1),
+                # Sessions
+                "total_sessions":         total_sessions,
+                "binge_sessions":         binge_count,
+                "binge_rate":             round(binge_count / max(total_sessions, 1), 3),
+                "avg_session_minutes":    round(avg_sess_min, 1),
+                "longest_session_minutes":round(max_sess_min, 1),
+                "max_binge_streak":       binge_streak_max,
+                # Velocity & behaviour
+                "avg_velocity":           round(avg_velocity, 2),
+                "avg_late_night_clips":   round(avg_late_night, 1),
+                "avg_morning_clips":      round(avg_morning, 1),
+                "rewatched_ratio":        round(avg_rewatched, 3),
+                "bad_days_ratio":         round(bad_days_ratio, 3),
+                # Peaks
+                "peak_hour":              peak_hour,
+                "peak_day":               peak_day,
             },
             "charts": {
-                "dates": daily['date'].astype(str).tolist(),
-                "scores": [round(x, 2) for x in daily['smoothed'].tolist()],
-                "threshold": float(model_data.get('robust_thresh', 250)),
-                "heatmap_z": z_matrix,
-                "radar_values": [round(x, 2) for x in radar_stats]
+                "dates":          trend_dates,
+                "scores":         trend_scores,
+                "clips":          trend_clips,
+                "watch_minutes":  trend_watch,
+                "velocity":       trend_velocity,
+                "radar_values":   [round(x, 2) for x in radar_values],
+                "radar_clips":    [round(x, 1) for x in radar_clips],
+                "heatmap_z":      z_matrix,
+                "weekly_bar":     weekly_bar,
+                "session_dist":   session_dist,
             },
             "gemini": ai_recommendation,
-            "metadata": {
-                "gemini_available": GEMINI_AVAILABLE,
-                "model_loaded": MODEL_LOADED,
-                "analyzed_at": datetime.now().isoformat()
-            }
         }
 
-    except HTTPException:
-        raise
+    except ValueError as ve:
+        raise HTTPException(400, str(ve))
     except Exception as e:
-        logger.error(f"Critical analysis error: {e}", exc_info=True)
+        logger.error(f"Critical error: {e}", exc_info=True)
         raise HTTPException(500, f"Analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":
-    print("\n" + "=" * 50)
-    print("🧠 DOPAMINE DEFENSE API SERVER")
-    print("=" * 50)
-    print(f"Gemini AI: {'✓ Enabled' if GEMINI_AVAILABLE else '✗ Disabled'}")
-    print(f"ML Models: {'✓ Loaded' if MODEL_LOADED else '✗ Using Defaults'}")
-    print("=" * 50 + "\n")
-
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
