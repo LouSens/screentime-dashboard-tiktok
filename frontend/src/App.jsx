@@ -176,7 +176,8 @@ function UploadPanel({ onBack }) {
     const fd = new FormData();
     fd.append('file', file);
     try {
-      const r = await fetch('http://localhost:8000/analyze', { method: 'POST', body: fd });
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const r = await fetch(`${API}/analyze`, { method: 'POST', body: fd });
       if (!r.ok) throw new Error(`Server error: ${r.status}`);
       setData(await r.json());
     } catch (e) {
