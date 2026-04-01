@@ -50,7 +50,12 @@ origins = [
     "http://localhost:5173",                # For local development
     "https://neural-void-lovat.vercel.app/", # <--- ADD YOUR VERCEL DOMAIN HERE
 ]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=origins, 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"])
 
 # ── Load ML artefacts ───────────────────────────────────────────────────────
 model_data = {}
