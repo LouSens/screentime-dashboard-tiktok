@@ -48,7 +48,7 @@ app = FastAPI(title="Neural Void — Behaviour Analysis")
 
 origins = [
     "http://localhost:5173",                # For local development
-    "https://neural-void-lovat.vercel.app/", # <--- ADD YOUR VERCEL DOMAIN HERE
+    "https://neural-void-lovat.vercel.app", # <--- ADD YOUR VERCEL DOMAIN HERE
 ]
 app.add_middleware(
     CORSMiddleware, 
