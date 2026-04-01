@@ -44,8 +44,13 @@ except Exception as e:
     logger.warning(f"Gemini unavailable: {e}")
 
 # ── App ─────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Neural Void — Behaviour Analysis API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="Neural Void — Behaviour Analysis")
+
+origins = [
+    "http://localhost:5173",                # For local development
+    "https://neural-void-lovat.vercel.app/", # <--- ADD YOUR VERCEL DOMAIN HERE
+]
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # ── Load ML artefacts ───────────────────────────────────────────────────────
 model_data = {}
